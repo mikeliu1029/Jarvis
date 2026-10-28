@@ -1,0 +1,56 @@
+# J.A.R.V.I.S. dependencies (Windows 10/11, Python 3.11+)
+# Installed by setup.ps1 into %USERPROFILE%\.jarvis\venv (kept out of OneDrive).
+
+# --- core ---
+requests>=2.31
+python-dotenv>=1.0
+rich>=13.7
+psutil>=5.9
+Pillow>=10.0
+numpy>=1.26
+
+# --- desktop HUD ---
+PyQt6>=6.6,<7
+
+# --- desktop control ---
+pyautogui>=0.9.54
+pynput>=1.7.7
+uiautomation>=2.0.20
+pycaw>=20240316
+pyperclip>=1.9
+
+# --- Windows built-in OCR (WinRT, fully local) ---
+winrt-runtime>=2.0
+winrt-Windows.Foundation>=2.0
+winrt-Windows.Foundation.Collections>=2.0
+winrt-Windows.Globalization>=2.0
+winrt-Windows.Graphics.Imaging>=2.0
+winrt-Windows.Media.Ocr>=2.0
+winrt-Windows.Storage.Streams>=2.0
+
+# --- web, news, answers ---
+feedparser>=6.0
+ddgs>=9.0
+trafilatura>=1.12
+
+# --- voice: mic, wake word, speech-to-text, text-to-speech ---
+sounddevice>=0.4.6
+soundfile>=0.12.1
+faster-whisper>=1.1
+openwakeword>=0.6.0
+kokoro-onnx>=0.4
+edge-tts>=6.1
+
+# --- Gemini Live (natural real-time voice) ---
+google-genai>=1.30
+
+# --- integrations ---
+google-api-python-client>=2.150
+google-auth-oauthlib>=1.2
+google-auth-httplib2>=0.2
+mcp>=1.9
+icalendar>=5.0
+recurring-ical-events>=2.2
+
+# --- optional cloud brain (only used when brain.provider = "anthropic") ---
+anthropic>=1.0

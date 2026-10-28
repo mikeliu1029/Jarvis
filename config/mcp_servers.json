@@ -1,0 +1,25 @@
+{
+  "_readme": "MCP servers Jarvis connects to at startup - their tools become Jarvis's tools. Set \"enabled\": true once credentials are in place. Servers launched with npx need Node.js (winget install OpenJS.NodeJS.LTS). Use \"url\" instead of \"command\" for remote (Streamable HTTP) servers. %VARS% and ~ are expanded.",
+  "mcpServers": {
+    "google-calendar": {
+      "enabled": false,
+      "command": "npx",
+      "args": ["-y", "@cocal/google-calendar-mcp"],
+      "env": { "GOOGLE_OAUTH_CREDENTIALS": "%USERPROFILE%/.jarvis/gcp-oauth.keys.json" }
+    },
+    "gmail": {
+      "enabled": false,
+      "command": "npx",
+      "args": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"]
+    },
+    "filesystem": {
+      "enabled": false,
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "%USERPROFILE%/Documents"]
+    },
+    "example-remote": {
+      "enabled": false,
+      "url": "https://example.com/mcp"
+    }
+  }
+}

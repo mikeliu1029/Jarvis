@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+# personal data Jarvis accumulates about you
+memory/logs/
+memory/*.json
+memory/*.bad
+*.log
+# credentials - never upload
+.env.*
+!.env.example
+client_secret*.json
+token_*.json

@@ -1,0 +1,129 @@
+# J.A.R.V.I.S. settings - edit freely, then restart Jarvis.
+# Secrets (API keys, calendar link, email password) go in the .env file, not here.
+
+[assistant]
+name = "J.A.R.V.I.S."      # shown in the HUD and used in the persona
+
+[user]
+title = "sir"              # how Jarvis addresses you
+name = ""                  # optional - your first name
+location = "auto"          # city for weather, e.g. "Austin, TX" or "London"; "auto" = from your IP address
+units = "auto"             # "imperial", "metric" or "auto" (imperial in the US)
+
+[brain]
+provider = "gemini_live"   # "gemini_live" (natural real-time voice, needs GEMINI_API_KEY in .env - falls back to local
+                           #   automatically), "ollama" (fully local) or "anthropic" (Claude API)
+
+[live]
+models = ["models/gemini-3.1-flash-live-preview", "models/gemini-2.5-flash-native-audio-latest"]  # tried in order
+voice = "Charon"           # male voices: Charon (deep, calm), Orus (firm), Algieba (smooth), Iapetus (clear),
+                           #   Rasalgethi, Fenrir, Puck. The British accent comes from the persona instructions.
+proactive_audio = true     # lets him stay silent when you're not talking to him
+barge_in = "auto"          # talk over him to interrupt: "auto" = only on headphones (speakers would echo)
+max_tool_steps = 10        # most actions one request may take
+new_conversation_after_minutes = 20
+max_turns_per_conversation = 12
+text_models = ["gemini-flash-lite-latest", "gemini-2.5-flash-lite"]  # quick text jobs (end-of-session notes)
+
+[brain.ollama]
+host = "http://127.0.0.1:11434"
+model = "qwen3-vl:8b"      # tool-calling + vision. "qwen3-vl:8b-instruct" skips the thinking step (snappier)
+vision_model = ""          # blank = use `model` (qwen3-vl can see); otherwise any Ollama vision model
+num_ctx = 16384            # context window; raise it if you connect many MCP tools
+temperature = 0.6
+keep_alive = "30m"         # how long the model stays in GPU memory after the last request
+
+[brain.anthropic]
+model = "claude-opus-5-5"  # alternatives: "claude-sonnet-5-5" or "claude-haiku-5-5" (faster, cheaper)
+effort = "low"             # low | medium | high - low keeps voice replies quick
+max_tokens = 16000
+
+[voice]
+input = true               # microphone + wake word ("Hey Jarvis")
+output = true              # speak replies
+wake_word = "hey_jarvis"
+wake_threshold = 0.5       # raise (0.6-0.7) if he wakes by accident, lower if he misses you
+hotkey = "<ctrl>+<alt>+j"  # push-to-talk / interrupt
+listen_mode = "always"     # "always": mic stays on until you mute it (F4) - say "Jarvis, ..." anywhere in a sentence
+                           # "wake_word": only listens after "Hey Jarvis"
+require_name = true        # always mode: only act on speech that includes "Jarvis" (false = everything you say is a command)
+conversation_seconds = 20  # after Jarvis replies, keep talking this long without saying his name
+end_silence_ms = 800       # pause length that ends your sentence
+stt_model = "small.en"     # tiny.en | base.en | small.en | medium.en | distil-large-v3
+stt_device = "cpu"         # "cuda" needs NVIDIA cuBLAS/cuDNN DLLs
+input_device = ""          # blank = Windows default mic, or part of a device name, e.g. "Arctis"
+output_device = ""         # blank = Windows default output, or part of a name, e.g. "Odyssey" (monitor speakers) or "Arctis"
+acknowledge = true         # say "One moment, sir" before slow actions
+
+[tts]
+engine = "kokoro"          # kokoro (local) | edge (free, online) | elevenlabs | fishaudio | sapi
+kokoro_voice = "bm_george" # British male: bm_george, bm_fable, bm_lewis, bm_daniel; blends like "bm_george:0.6,bm_fable:0.4"
+kokoro_speed = 1.05
+edge_voice = "en-GB-RyanNeural"   # or en-GB-ThomasNeural
+edge_rate = "+0%"
+sapi_voice = "George"
+
+[hud]
+mode = "desktop"           # "desktop" (native window, MARK LVI-style), "browser" (web page) or "off"
+port = 7777                # browser mode only
+open_on_start = true       # browser mode only
+app_window = true          # browser mode only: borderless Edge app window
+popup = true               # desktop mode: a small bar slides down from the top of the screen while he talks
+caption_delay_ms = -250    # pop-up words ahead of his voice? raise this (e.g. 0). Behind? lower it (e.g. -400)
+
+[memory]
+prompt_budget_chars = 1400 # how much of the long-term memory rides along in every prompt (the rest is recalled on demand)
+
+[monitor]
+check_every_hours = 4      # how often watched news topics are checked
+
+[briefing]
+on_first_launch = "auto"   # "auto" (full briefing), "offer" (ask first) or "off" - the first start of each day
+news_on_launch = true      # every other start: a quick spoken rundown of the top headlines
+open_article_on_launch = true  # ...then he opens one article he thinks you'd like, in your browser
+time = ""                  # e.g. "08:00" to deliver it automatically while Jarvis is running
+sections = ["last_session", "weather", "calendar", "news", "tasks", "email", "school", "system"]
+news_categories = ["top", "world", "tech"]
+headlines_per_category = 2
+
+[proactive]
+enabled = true             # flag low disk/battery, runaway CPU, etc.
+cpu_high = 92              # % sustained for ~3 minutes
+memory_high = 92           # %
+disk_low_gb = 15
+battery_low = 20
+
+[safety]
+confirm_commands = "risky" # "risky" (ask unless read-only), "always" or "never"
+confirm_overwrite = true
+confirm_power = true
+
+[mcp_server]
+allow_confirmed_tools = false  # expose run_command/power/kill/overwrite to MCP clients (they have no confirm prompt)
+
+[apps]
+browser = "chrome"         # links, articles and trailers open here: "chrome" or "default"
+game_news_on_launch = true # opening a Steam/Epic game also gets you its latest update and a line of context
+
+[apps.aliases]
+"vs code" = "Visual Studio Code"
+"vscode" = "Visual Studio Code"
+"code" = "Visual Studio Code"
+"chrome" = "Google Chrome"
+"edge" = "Microsoft Edge"
+"browser" = "Google Chrome"
+"explorer" = "File Explorer"
+"files" = "File Explorer"
+"terminal" = "Terminal"
+"task manager" = "Task Manager"
+"control panel" = "Control Panel"
+
+[news.feeds]
+top = ["https://feeds.npr.org/1001/rss.xml", "https://feeds.bbci.co.uk/news/world/rss.xml"]
+world = ["https://feeds.bbci.co.uk/news/world/rss.xml"]
+us = ["https://feeds.npr.org/1003/rss.xml"]
+business = ["https://feeds.bbci.co.uk/news/business/rss.xml"]
+tech = ["https://www.theverge.com/rss/index.xml", "https://feeds.arstechnica.com/arstechnica/index"]
+science = ["https://feeds.bbci.co.uk/news/science_and_environment/rss.xml"]
+sports = ["https://www.espn.com/espn/rss/news"]
+entertainment = ["https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml"]

@@ -1,0 +1,1 @@
+"""Minimal browser HUD."""
