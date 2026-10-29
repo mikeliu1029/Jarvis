@@ -373,6 +373,65 @@ class SuitCore(HudCanvas):
         p.end()
 
 
+class CoreSphere(HudCanvas):
+    """The original reactor core in the centre, with his state, the power line and the PC's condition below."""
+
+    def __init__(self, jarvis: "Jarvis", parent=None):
+        name = str(jarvis.settings.get("assistant.name", "J.A.R.V.I.S.") or "J.A.R.V.I.S.").upper()
+        super().__init__(name, parent)
+        self.jarvis = jarvis
+        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, False)
+        self.setMinimumSize(360, 380)
+        self.power_line = ""
+        self.strain_line, self.strain_level = "", "ok"
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        if not p.isActive():
+            return
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        W, H = self.width(), self.height()
+        text_h = 104
+        band = max(120.0, H - text_h)
+        self._paint_core(p, W / 2, band / 2, min(W * 0.46, band / 2 - 6), W, band)
+        y = band + 2
+        if self.muted:
+            txt, col = "⊘  MIC MUTED", qcol(C.MUTED_C)
+        elif self.speaking:
+            txt, col = "●  SPEAKING", qcol(C.ACC)
+        elif self.state == "thinking":
+            txt, col = f"{'◈' if self._blink else '◇'}  THINKING", qcol(C.ACC2)
+        elif self.state == "listening":
+            txt, col = f"{'●' if self._blink else '○'}  LISTENING", qcol(C.GREEN)
+        else:
+            txt, col = f"{'●' if self._blink else '○'}  STANDING BY", qcol(C.PRI)
+        p.setFont(_font(MONO, 11, True))
+        p.setPen(QPen(col, 1))
+        p.drawText(QRectF(0, y, W, 20), Qt.AlignmentFlag.AlignCenter, txt)
+        # waveform
+        N, bw = 36, 8
+        x0, amp, mid = (W - N * bw) / 2, self._amp_disp, (N - 1) / 2.0
+        for i in range(N):
+            if self.muted:
+                hgt, cl = 2, qcol(C.MUTED_C)
+            else:
+                env = (1.0 - abs(i - mid) / mid) ** 0.7
+                shimmer = 0.55 + 0.45 * math.sin(self._tick * 0.18 + i * 0.7)
+                idle = 3.0 + 2.0 * math.sin(self._tick * 0.09 + i * 0.6)
+                hgt = int(max(2, min(22, idle + amp * 20.0 * env * shimmer)))
+                cl = (qcol(C.PRI) if hgt > 12 else qcol(C.PRI_DIM)) if amp > 0.05 else qcol(C.BORDER_B)
+            p.fillRect(QRectF(x0 + i * bw, y + 46 - hgt, bw - 1, hgt), cl)
+        p.setFont(_font(SANS, 10, True))
+        p.setPen(QPen(qcol(C.WHITE), 1))
+        p.drawText(QRectF(0, y + 52, W, 20), Qt.AlignmentFlag.AlignCenter, self.power_line)
+        scol = {"ok": C.GREEN, "busy": C.ACC2, "strained": C.RED}.get(self.strain_level, C.TEXT_MED)
+        p.setFont(_font(SANS, 9))
+        p.setPen(QPen(qcol(scol), 1))
+        p.drawText(QRectF(0, y + 74, W, 20), Qt.AlignmentFlag.AlignCenter,
+                   QFontMetrics(p.font()).elidedText(self.strain_line, Qt.TextElideMode.ElideRight, int(W - 20)))
+        p.end()
+
+
 # ---- system ---------------------------------------------------------------------------------------
 class RingGauge(QWidget):
     """Two rings: CPU outside (orange), memory inside (cyan)."""

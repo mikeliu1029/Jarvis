@@ -580,7 +580,7 @@ class MainWindow(QMainWindow):
         core_row = QHBoxLayout()
         core_row.setSpacing(4)
         core_row.addWidget(D.LinksPanel(jarvis))
-        self.hud = D.SuitCore(jarvis)
+        self.hud = D.CoreSphere(jarvis)
         core_row.addWidget(self.hud, 1)
         core_row.addLayout(self._chips())
         centre.addLayout(core_row, 5)

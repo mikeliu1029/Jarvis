@@ -35,7 +35,7 @@ No files to edit.
 
 Start him with the desktop button (or `run_jarvis.bat`). His window is a full HUD, and every panel works:
 
-- **Centre:** a suit-and-helmet wireframe whose eyes and arc reactor light up with his voice, his state (listening / thinking / speaking), and how the PC is doing. Above it, a command box; beside it, links to your sites.
+- **Centre:** the animated reactor core, which reacts to his voice (and yours), with his state (listening / thinking / speaking), and how the PC is doing. Above it, a command box; beside it, links to your sites.
 - **Clickable status chips:** AI core (opens his key settings), voice (voice settings), ears (click to mute), memory, settings.
 - **Left:**
   - **Launch tabs** for your apps.
