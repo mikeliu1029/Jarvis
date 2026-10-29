@@ -24,17 +24,17 @@ from .registry import P, registry
 
 log = logging.getLogger(__name__)
 
-CONNECT = ("Google isn't connected yet. The user can double-click connect_google.bat in the Jarvis folder - "
-           "about five minutes, once.")
+CONNECT = ("Google isn't connected yet. It's set up in Jarvis's Settings window, Google page - about five minutes, "
+           "once. Offer to open it (open_settings page=google).")
 
 
 def _http_error_text(e: Exception) -> str:
     text = str(e)
     if "insufficient" in text.lower() or "PERMISSION_DENIED" in text:
-        return ("Google refused - that permission wasn't granted at sign-in. Run connect_google.bat again and tick "
+        return ("Google refused - that permission wasn't granted at sign-in. In Settings → Google, sign in again and tick "
                 "'Select all'.")
     if "has not been used" in text or "is disabled" in text:
-        return "That Google service isn't switched on in the Jarvis project - run connect_google.bat again."
+        return "That Google service isn't switched on in the user's Google Cloud project - step 2 in Settings → Google."
     return f"Google returned an error: {text[:200]}"
 
 
@@ -693,7 +693,7 @@ def classroom(action: str = "due", days: int = 7) -> str:
         fallback = _guardian_emails()
         if fallback:
             return fallback + "\nTell the user what's due or missing from this summary, briefly."
-        return outcome.failed("Classroom isn't connected. Run connect_google.bat and sign in your son's school "
+        return outcome.failed("Classroom isn't connected. In Settings → Google, click 'Connect son's Classroom' and sign in his school "
                               "account. (If the school blocks it, Classroom's guardian summary emails work too - "
                               "the teacher can add you as a guardian.)")
     who = ga.email_of("classroom") or "your son"
@@ -783,3 +783,28 @@ def _check_classroom() -> str:
 
 HEALTH_CHECKS = [("Calendar", _check_calendar), ("Gmail", _check_gmail), ("Contacts", _check_contacts),
                  ("Drive", _check_drive), ("Classroom", _check_classroom)]
+
+ENABLE_APIS_URL = ("https://console.cloud.google.com/flows/enableapi?apiid=calendar-json.googleapis.com,"
+                   "gmail.googleapis.com,people.googleapis.com,drive.googleapis.com,classroom.googleapis.com")
+
+
+def short_error(e: Exception) -> str:
+    """A one-line reason a Google check failed."""
+    text = str(e)
+    if "SERVICE_DISABLED" in text or "has not been used in project" in text or "is disabled" in text:
+        return "switched off in your Google project - use 'Turn on missing services'"
+    if "insufficient" in text.lower() or "PERMISSION_DENIED" in text:
+        return "permission not granted at sign-in - sign in again and tick Select all"
+    if isinstance(e, ga.NotConnected):
+        return "not signed in"
+    return text.splitlines()[0][:120]
+
+
+def run_health_checks() -> list[tuple[str, bool, str]]:
+    out = []
+    for label, fn in HEALTH_CHECKS:
+        try:
+            out.append((label, True, fn()))
+        except Exception as e:
+            out.append((label, False, short_error(e)))
+    return out

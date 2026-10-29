@@ -302,6 +302,28 @@ def _power_question(args: dict) -> str | None:
 
 
 @registry.tool(
+    "open_settings",
+    "Open Jarvis's own Settings window - for 'open settings', 'change your voice', 'use my headset mic', "
+    "'connect Google', 'change your personality' and similar. The user changes things there themselves.",
+    {"page": P("string", "Which page to open", required=False,
+               enum=["start", "you", "voice", "google", "briefing", "display", "apps", "safety", "personality",
+                     "offline", "system"])},
+)
+def open_settings(page: str = "") -> str:
+    from ..events import bus
+    from ..hud import settings_window
+    if settings_window.ATTACHED:
+        bus.emit("open_settings", page=page or "")
+    else:
+        import sys
+
+        from ..config import PROJECT_DIR
+        subprocess.Popen([sys.executable, "-m", "jarvis", "--settings", page or ""], cwd=str(PROJECT_DIR),
+                         creationflags=winutil.NO_WINDOW)
+    return outcome.done("Opened the Settings window" + (f" on the {page} page" if page else "") + ".")
+
+
+@registry.tool(
     "power",
     "Lock the PC, sleep, sign out, or shut down / restart the PC (with a one-minute delay, or _now when the user "
     "wants it immediately); 'cancel' aborts a pending shutdown or restart. close_jarvis closes Jarvis himself - "

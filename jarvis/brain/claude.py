@@ -45,7 +45,7 @@ class ClaudeBrain(Brain):
     def check(self) -> tuple[bool, str]:
         from ..config import secret
         if not (secret("ANTHROPIC_API_KEY") or secret("ANTHROPIC_AUTH_TOKEN")):
-            return False, "No ANTHROPIC_API_KEY in .env (needed when brain.provider = \"anthropic\")."
+            return False, "No Claude key - add it in Settings → Getting started → Other services."
         return True, ""
 
     def _create(self):
@@ -126,7 +126,7 @@ class ClaudeBrain(Brain):
             else:
                 reply = "That took more steps than I'd like, sir. I've stopped there."
         except a.AuthenticationError:
-            reply = "My Claude credentials were rejected, sir. Do check the API key in the .env file."
+            reply = "My Claude credentials were rejected, sir. Do check the key in Settings."
             self.reset()
         except a.RateLimitError:
             reply = "Claude is rate-limiting us at the moment, sir. Give it a minute."

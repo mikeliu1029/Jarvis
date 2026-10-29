@@ -108,7 +108,7 @@ def _checks():
         from .config import secret
         key = secret("GEMINI_API_KEY")
         if not key:
-            return "no GEMINI_API_KEY in .env - using the local voice"
+            return "no Gemini key yet - add it in Settings → Getting started"
         model = (s.get("live.models") or ["models/gemini-3.1-flash-live-preview"])[0]
 
         async def connect():
@@ -122,15 +122,14 @@ def _checks():
     def google():
         from . import google_auth as ga
         if not ga.connected("main"):
-            return "not connected - double-click connect_google.bat to add Calendar, Gmail and Classroom"
+            return "not connected (optional) - Settings → Google adds Calendar, Gmail and Classroom"
         from .tools import gservices
-        results = []
-        for label, fn in gservices.HEALTH_CHECKS:
-            try:
-                results.append(f"{label} {fn()}")
-            except Exception as e:
-                raise RuntimeError(f"{label}: {e}") from e
-        return f"{ga.email_of('main')}: " + "; ".join(results)
+        results = gservices.run_health_checks()
+        text = f"{ga.email_of('main')}: " + "; ".join(f"{label} {'ok' if ok else '- ' + msg}"
+                                                       for label, ok, msg in results)
+        if not all(ok for _, ok, _ in results):
+            raise RuntimeError(text)
+        return text
 
     def mcp_config():
         from .tools.mcp_bridge import load_config

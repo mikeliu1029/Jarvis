@@ -215,7 +215,7 @@ def calendar_ics(day: str = "today") -> str:
                   "week": (today, today + timedelta(days=7))}.get(day or "today", (today, today + timedelta(days=1)))
     events = calendar_events(start, end)
     if events is None:
-        return "No calendar is configured (set CALENDAR_ICS_URL in .env, or connect a calendar MCP server)."
+        return "No calendar is connected - set it up in Settings → Google."
     if not events:
         return f"Nothing on the calendar {'this week' if day == 'week' else day}."
     # Event titles are written by whoever sent the invite - outside content.
@@ -253,6 +253,5 @@ def inbox_summary(limit: int = 5) -> str | None:
 def check_email(limit: int = 5) -> str:
     summary = inbox_summary(max(1, min(int(limit or 5), 20)))
     if summary is None:
-        return ("Email isn't configured. Add IMAP_USER and IMAP_PASSWORD (an app password) to .env, "
-                "or connect an email MCP server.")
+        return "Email isn't connected - set it up in Settings → Google."
     return summary

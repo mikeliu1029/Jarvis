@@ -11,3 +11,7 @@ memory/*.bad
 !.env.example
 client_secret*.json
 token_*.json
+# your own choices from the Settings window
+config/my_settings.json
+config/my_settings.tmp
+config/persona.default.md

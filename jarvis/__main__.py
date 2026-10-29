@@ -34,7 +34,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--no-hud", action="store_true", help="don't start the browser HUD")
     p.add_argument("--setup", action="store_true", help="download voice/speech models and exit")
     p.add_argument("--selftest", action="store_true", help="check every subsystem and exit")
-    p.add_argument("--google", action="store_true", help="connect Google (Calendar, Gmail, Drive, Classroom)")
+    p.add_argument("--google", action="store_true", help="connect Google from the console (the Settings window "
+                                                         "does this too)")
+    p.add_argument("--settings", nargs="?", const="", metavar="PAGE", help="open only the Settings window")
+    p.add_argument("--wait-pid", type=int, help=argparse.SUPPRESS)  # restart: wait for the old Jarvis to exit
     p.add_argument("--say", metavar="TEXT", help="speak a line in Jarvis's voice and exit")
     p.add_argument("--ask", metavar="TEXT", help="ask one question, print/speak the answer and exit")
     p.add_argument("--verbose", action="store_true", help="debug logging to memory/logs/jarvis.log")
@@ -57,6 +60,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.google:
         from .google_setup import main as google_setup
         return google_setup()
+    if args.settings is not None:
+        return _run_settings(args.settings)
+    if args.wait_pid:
+        try:
+            import psutil
+            psutil.Process(args.wait_pid).wait(timeout=60)
+        except Exception:
+            pass
     if args.say:
         from .voice.tts import Speaker
         Speaker(settings).speak(args.say)
@@ -111,6 +122,16 @@ def main(argv: list[str] | None = None) -> int:
 
 
 _instance_mutex = None
+
+
+def _run_settings(page: str) -> int:
+    """Just the Settings window (from connect_google.bat, or when Jarvis isn't running)."""
+    from .hud.desktop import create_app
+    from .hud.settings_window import SettingsWindow
+    app = create_app()
+    win = SettingsWindow(None, page)
+    win.show()
+    return app.exec()
 
 
 def _single_instance() -> bool:

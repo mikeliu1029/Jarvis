@@ -49,13 +49,41 @@ class Settings:
 _settings: Settings | None = None
 _lock = threading.Lock()
 
+# settings.toml holds the defaults that ship with Jarvis. Whatever the user changes in the Settings window
+# goes here instead - a private file, never uploaded, that wins over the defaults.
+USER_SETTINGS = CONFIG_DIR / "my_settings.json"
+ENV_FILE = PROJECT_DIR / ".env"
+
 
 def load_env() -> None:
     try:
         from dotenv import load_dotenv
     except ImportError:
         return
-    load_dotenv(PROJECT_DIR / ".env", override=False)
+    load_dotenv(ENV_FILE, override=False)
+
+
+def _merge(base: dict, over: dict) -> dict:
+    for k, v in over.items():
+        if isinstance(v, dict) and isinstance(base.get(k), dict):
+            _merge(base[k], v)
+        else:
+            base[k] = v
+    return base
+
+
+def user_overrides() -> dict:
+    import json
+    try:
+        data = json.loads(USER_SETTINGS.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def default_settings() -> Settings:
+    path = CONFIG_DIR / "settings.toml"
+    return Settings(tomllib.loads(path.read_text(encoding="utf-8-sig")) if path.exists() else {})
 
 
 def get_settings() -> Settings:
@@ -63,14 +91,44 @@ def get_settings() -> Settings:
     with _lock:
         if _settings is None:
             load_env()
-            path = CONFIG_DIR / "settings.toml"
-            data = tomllib.loads(path.read_text(encoding="utf-8-sig")) if path.exists() else {}
-            _settings = Settings(data)
+            _settings = Settings(_merge(default_settings().data, user_overrides()))
             for folder in (MEMORY_DIR, LOG_DIR, MODELS_DIR, CACHE_DIR):
                 folder.mkdir(parents=True, exist_ok=True)
         return _settings
 
 
+def save_user_setting(key: str, value: Any) -> None:
+    """Remember a choice made in the Settings window (and use it right away where Jarvis reads it live)."""
+    import json
+    with _lock:
+        data = user_overrides()
+        node = data
+        parts = key.split(".")
+        for part in parts[:-1]:
+            node = node.setdefault(part, {})
+        node[parts[-1]] = value
+        tmp = USER_SETTINGS.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(USER_SETTINGS)
+    if _settings is not None:
+        _settings.set(key, value)
+
+
 def secret(name: str) -> str:
     """Read an API key or credential from the environment / .env file."""
     return (os.environ.get(name) or "").strip()
+
+
+def set_secret(name: str, value: str) -> None:
+    """Store an API key in .env (on this PC only) and use it from now on."""
+    from dotenv import set_key, unset_key
+    value = (value or "").strip()
+    if not ENV_FILE.exists():
+        ENV_FILE.write_text("# Keys and passwords for Jarvis - set them in Jarvis's Settings window.\n",
+                            encoding="utf-8")
+    if value:
+        set_key(str(ENV_FILE), name, value, quote_mode="never")
+        os.environ[name] = value
+    else:
+        unset_key(str(ENV_FILE), name)
+        os.environ.pop(name, None)

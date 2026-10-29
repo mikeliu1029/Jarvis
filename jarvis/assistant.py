@@ -84,7 +84,9 @@ class Jarvis:
         provider = str(settings.get("brain.provider", "gemini_live")).lower()
         self.use_live = (provider in ("gemini_live", "gemini") and bool(secret("GEMINI_API_KEY"))
                          and self.voice_in and self.voice_out)
-        if not self.use_live:
+        # Fresh install, no key yet: wait for it (the Settings window asks) rather than limp along offline.
+        self.awaiting_key = provider in ("gemini_live", "gemini") and not secret("GEMINI_API_KEY")
+        if not self.use_live and not self.awaiting_key:
             self._init_local_speaker()
         self.hud = None
         # `hud` here means the optional *browser* HUD; the desktop HUD is a window run by __main__.
@@ -136,7 +138,9 @@ class Jarvis:
         self.mcp.start()
         threading.Thread(target=self._worker, name="jarvis-worker", daemon=True).start()
         threading.Thread(target=self._scheduler, name="jarvis-scheduler", daemon=True).start()
-        if self.use_live:
+        if self.awaiting_key:
+            pass  # nothing to talk with yet - greet() explains
+        elif self.use_live:
             from .live import GeminiLive
             self.live = GeminiLive(self, self.settings)
             self.live.start()
@@ -315,6 +319,12 @@ class Jarvis:
         text = text.replace(chr(0xFEFF), "").strip()
         if not text:
             return
+        if self.awaiting_key:
+            bus.emit("user", text=text, source=source)
+            bus.emit("notice", level="info", text="I'll need my Gemini key first - it's in the Settings window "
+                                                  "(the ⚙ SETTINGS button), under Getting started.")
+            bus.emit("open_settings", page="start")
+            return
         if self.live_active:
             if self.live.pending and (YES.match(text) or NO.match(text)):
                 bus.emit("user", text=text, source=source)
@@ -474,6 +484,10 @@ class Jarvis:
     def greet(self) -> None:
         hour = datetime.now().hour
         part = "morning" if hour < 12 else "afternoon" if hour < 18 else "evening"
+        if self.awaiting_key:
+            bus.emit("notice", level="info", text="Welcome! Jarvis needs a free Gemini key for his voice - the "
+                                                  "Settings window shows you how (about two minutes).")
+            return
         if not self.ok:
             self.say(f"Good {part}, {self.title}. I'm online, but there's a problem: {self.brain_problem}")
             return

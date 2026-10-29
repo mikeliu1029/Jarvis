@@ -3,30 +3,48 @@
 A local, voice-driven assistant for Windows with a British voice, a dry wit, and hands on your PC.
 Say **"Hey Jarvis"** and talk to it like you would the real one.
 
-**Voice engine.** By default he talks through **Gemini Live** (`GEMINI_API_KEY` in `.env`). Gemini hears you and answers in a natural voice, with the first word in about half a second, and you can talk over him on headphones. He speaks with Gemini's "Charon" voice and is told to use a British accent; other male voices are listed in `[live]` in `config/settings.toml`.
+**Voice engine.** He talks through **Gemini Live**: it hears you and answers in a natural voice, with the first word in about half a second, and you can talk over him on headphones. It needs a free key, which the Settings window walks you through getting.
 
 **What stays on your PC.** All tools run locally: apps, games, the screen, memory, the HUD and the safety checks. Jarvis also decides locally whether you were talking to him. If you didn't say "Jarvis" and you're not mid-conversation, his reply is never played and no tool runs.
 
-**Privacy.** While the mic is on, room audio streams to Google. F4 mutes it.
+**Privacy.** While the mic is on, room audio streams to Google; F4 mutes it. Gemini's free tier lets Google use what it's sent to improve its services.
 
-**Fallback.** If Gemini is unreachable or out of free quota, he switches to the fully local pipeline: Ollama + `qwen3-vl:8b`, Whisper and the Kokoro voice. Set `[brain] provider = "ollama"` to always stay local.
+**Fallback.** If Gemini is unreachable or out of free use, he can switch to a fully offline voice and brain (Settings → Offline mode).
 
-## Start
+## Install (Windows 10/11)
 
-Double-click **`run_jarvis.bat`**, or press Run on `Jarvis.py` in VS Code. The first run installs everything automatically.
+1. **Download.** On this page, click the green **Code** button → **Download ZIP**. Right-click the ZIP → **Extract All** → pick a folder such as Documents, then open the extracted folder.
+2. **Double-click `run_jarvis.bat`.** If Windows says "Windows protected your PC", click **More info → Run anyway**; Windows shows this for any script downloaded from the internet. The first run installs everything, including Python if you don't have it. It takes about five minutes, then puts a **Jarvis button on your desktop** and opens Jarvis.
+3. **Paste your free key.** Jarvis's Settings window opens on *Getting started*. Click **Get my free key**, follow the four steps on screen, then click **Paste** and **Save & test**. Jarvis restarts and greets you.
+4. **Say "Jarvis, what's the news?"**
 
-Options: `--text` (keyboard only), `--mute` (no speech), `--no-hud`, `--selftest` (check every subsystem), `--say "text"`, `--ask "question"`.
+From then on, start him with the desktop button.
 
-A desktop HUD window opens alongside the console. It has:
+**Everything else is in the Settings window:** the ⚙ SETTINGS button in Jarvis's window, or just say "Jarvis, open settings". It covers:
+- your name and city
+- his voice, your microphone and speakers
+- Google (Calendar, Gmail, Classroom)
+- the morning briefing and the pop-up
+- safety, his personality, offline mode, and starting with Windows
+
+No files to edit.
+
+**Updating.** Download the new ZIP and extract it over the old folder (choose *Replace*). Your key, settings and memory aren't in the ZIP, so they're kept. New components install by themselves on the next start.
+
+## Using Jarvis
+
+Start him with the desktop button (or `run_jarvis.bat`). His window has:
 - **Reactor core and waveform:** they react to Jarvis's voice and yours.
 - **System monitor:** CPU, memory, network, GPU and GPU temperature.
 - **Typewriter activity log** and a **command box**.
 - **Results panel:** search, news and briefing results.
-- **Buttons:** Talk, Interrupt (Esc) and Mute mic (F4), plus panels for memory and settings.
+- **Buttons:** Talk, Interrupt (Esc), Mute mic (F4), Memory and Settings.
 
-Close the window to shut Jarvis down. Set `[hud] mode = "browser"` for the older web HUD.
+Close the window to shut Jarvis down, or say "Jarvis, shut down".
 
-**Pop-up.** While he talks, a small bar slides down from the top of your screen. It shows a mini reactor, his voice level and his words. Each caption is released when its audio is actually heard, after allowing for the sound card's delay, and the words type out at speaking pace. It slides back up about a second after he finishes. If the words still run ahead of or behind his voice on your headset, adjust `[hud] caption_delay_ms`. It never takes focus and clicks pass through it, so it's safe over games. Turn it off with `[hud] popup = false`.
+**Pop-up.** While he talks, a small bar slides down from the top of your screen. It shows a mini reactor, his voice level and his words. Each caption appears as its audio is heard and types out at speaking pace, and the bar slides back up when he finishes. It never takes focus and clicks pass through it, so it's safe over games. If the words run ahead of or behind his voice, adjust the timing slider in Settings → Pop-up & display.
+
+For tinkerers, `run_jarvis.bat` takes options: `--text` (keyboard only), `--mute`, `--no-hud`, `--selftest`, `--settings`, `--say "text"`, `--ask "question"`.
 
 ## Built on MARK LVI
 
@@ -82,7 +100,7 @@ How listening works:
 - **Name him anywhere in the sentence:** "Jarvis, boot up Cyberpunk" or "what's the weather, Jarvis?". Speech without his name is ignored.
 - **Follow-ups:** for 20 seconds after he answers you can keep talking without his name. Saying just "Jarvis?" gets a "Yes, sir?".
 - **Interrupt him** with "Hey Jarvis", Ctrl+Alt+J, Esc, or "stop".
-- **Check the devices:** the activity log shows which microphone and speaker he's using at start-up. Change them with `voice.input_device` / `voice.output_device` in `config/settings.toml`.
+- **Check the devices:** the activity log shows which microphone and speaker he's using at start-up. Change them in Settings → Voice & microphone.
 
 On start-up:
 - **Briefing:** the first launch of the day gets the full briefing, and every later launch gets a quick spoken news rundown.
@@ -96,10 +114,12 @@ Links, articles and trailers open in Chrome even though Edge is the default brow
 
 ```
 Jarvis/
-├── run_jarvis.bat · setup.ps1 · requirements.txt · .env(.example)
+├── run_jarvis.bat · setup.ps1 · connect_google.bat · requirements.txt · jarvis.ico
+├── .env                   your keys (written by the Settings window; never uploaded)
 ├── mcp_server.py          MCP hooks, outbound: Jarvis's tools for Claude Desktop / Claude Code
 ├── config/
-│   ├── settings.toml      every knob: voice, brain, wake word, news feeds, briefing, safety
+│   ├── settings.toml      the defaults for every option
+│   ├── my_settings.json   your changes from the Settings window (never uploaded)
 │   ├── persona.md         the system prompt (personality and rules); edit to taste
 │   └── mcp_servers.json   MCP hooks, inbound: calendar/email/other servers Jarvis connects to
 ├── plugins/               drop-in skills (copy _template.py)
@@ -140,11 +160,11 @@ Speech recognition is `[voice] stt_model` (default `small.en` on CPU). The wake 
 ## Brain
 
 - **Local (default):** Ollama with `qwen3-vl:8b`, a model that can call tools and see the screen. For snappier replies, `ollama pull qwen3-vl:8b-instruct` and set `model` to that (it skips the thinking step).
-- **Claude (optional):** set `[brain] provider = "anthropic"` and put `ANTHROPIC_API_KEY` in `.env`. The default model is `claude-opus-5-5` at `effort = "low"` for quick voice replies. `claude-sonnet-5-5` and `claude-haiku-5-5` are faster and cheaper. Server-side refusal fallbacks are switched on (`fallbacks: "default"`), so a false-positive safety decline is retried on another Claude model instead of failing.
+- **Claude (optional):** set `[brain] provider = "anthropic"` and add the Claude key in Settings → Getting started → Other services. The default model is `claude-opus-5-5` at `effort = "low"` for quick voice replies. `claude-sonnet-5-5` and `claude-haiku-5-5` are faster and cheaper. Server-side refusal fallbacks are switched on (`fallbacks: "default"`), so a false-positive safety decline is retried on another Claude model instead of failing.
 
 ## Google (Calendar, Gmail, Contacts, Drive, Classroom)
 
-Double-click **`connect_google.bat`**. The first time, it walks you through making a free, private Google Cloud project for Jarvis (about five minutes) and then signs you in. Each step opens the right page in Chrome. Google requires that project: Jarvis isn't a published app, so it needs a key of its own.
+Open **Settings → Google** (or double-click `connect_google.bat`). The first time, it walks you through making a free, private Google Cloud project for Jarvis (about five minutes, each step has an *Open page* button), picks up the key file from your Downloads by itself, and signs you in. Google requires that project: Jarvis isn't a published app, so it needs a key of its own. In Google's *Audience* page, add your account (and your son's) under **Test users**; Google then asks you to sign in again every 7 days, and Jarvis opens that sign-in for you when it's due.
 
 | Service | What Jarvis can do |
 |---|---|

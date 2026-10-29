@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import ctypes
 import math
-import os
 import threading
 import time
 from typing import TYPE_CHECKING
@@ -22,7 +21,6 @@ from PyQt6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QLineEdi
                              QPushButton, QScrollArea, QSizePolicy, QSplitter, QTextEdit, QVBoxLayout,
                              QWidget)
 
-from ..config import CONFIG_DIR
 from ..events import bus
 
 if TYPE_CHECKING:
@@ -581,6 +579,10 @@ class MainWindow(QMainWindow):
         for e in list(bus.history):
             if e["type"] in ("notice", "user", "jarvis"):
                 self._on_event(e)
+        from . import settings_window
+        settings_window.ATTACHED = True
+        if settings_window.SettingsWindow.needs_key():  # first run: straight to "paste your key"
+            QTimer.singleShot(700, lambda: self.open_settings("start"))
 
         for keys, fn in (("Escape", self.jarvis.interrupt), ("F4", self._toggle_mic), ("F11", self._toggle_full)):
             QShortcut(QKeySequence(keys), self).activated.connect(fn)
@@ -614,6 +616,8 @@ class MainWindow(QMainWindow):
             self._show_content(e.get("title", ""), e.get("text", ""))
         elif kind == "mic":
             self._style_mic()
+        elif kind == "open_settings":
+            self.open_settings(e.get("page", ""))
         elif kind == "quit":
             self.close()
 
@@ -736,7 +740,7 @@ class MainWindow(QMainWindow):
         mem = self._btn("🧠 MEMORY", C.TEXT_MED, height=26)
         mem.clicked.connect(self._open_memory)
         cfg = self._btn("⚙ SETTINGS", C.TEXT_MED, height=26)
-        cfg.clicked.connect(lambda: os.startfile(str(CONFIG_DIR / "settings.toml")))
+        cfg.clicked.connect(lambda: self.open_settings())
         tools.addWidget(mem)
         tools.addWidget(cfg)
         lay.addLayout(tools)
@@ -870,8 +874,29 @@ class MainWindow(QMainWindow):
         self._memory_ov = MemoryOverlay(self.jarvis.memory, self.centralWidget())
         self._centre(self._memory_ov)
 
+    def open_settings(self, page: str = "") -> None:
+        from .settings_window import SettingsWindow
+        win = getattr(self, "_settings_win", None)
+        if win is None or not win.isVisible():
+            self._settings_win = win = SettingsWindow(self.jarvis, page, on_restart=self.restart)
+        elif page:
+            win.show_page(page)
+        win.show()
+        win.raise_()
+        win.activateWindow()
+
+    def restart(self) -> None:
+        """Start a fresh Jarvis (it waits for this one to finish) and close this one."""
+        from .. import shortcuts
+        self._log.add("SYS: Restarting…", "sys")
+        shortcuts.relaunch_self()
+        QTimer.singleShot(300, self.close)
+
     def closeEvent(self, event):
         bus.unsubscribe(self._from_bus)
+        win = getattr(self, "_settings_win", None)
+        if win is not None:
+            win.close()
         super().closeEvent(event)
 
 

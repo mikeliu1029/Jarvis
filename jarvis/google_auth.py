@@ -60,6 +60,51 @@ def has_client() -> bool:
     return CLIENT_FILE.exists()
 
 
+def is_client_file(path: Path) -> bool:
+    """The JSON Google gives you for a *Desktop app* OAuth client."""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        return "installed" in data and "client_id" in data["installed"]
+    except (OSError, ValueError):
+        return False
+
+
+def download_dirs() -> list[Path]:
+    home = Path.home()
+    dirs = [home / "Downloads", home / "OneDrive" / "Downloads"]
+    try:  # wherever Windows really keeps Downloads
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders") as k:
+            val, _ = winreg.QueryValueEx(k, "{374DE290-123F-4565-9164-39C4925E467B}")
+            dirs.insert(0, Path(os.path.expandvars(val)))
+    except OSError:
+        pass
+    return [d for d in dict.fromkeys(dirs) if d.exists()]
+
+
+def find_downloaded_client(since: float = 0) -> Path | None:
+    """A client_secret_....json in Downloads (newer than `since`), if Google's download has landed."""
+    for d in download_dirs():
+        for f in sorted(d.glob("client_secret*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+            if f.stat().st_mtime >= since and is_client_file(f):
+                return f
+    return None
+
+
+def import_client(path: Path, remove_original: bool = True) -> None:
+    import shutil
+    if not is_client_file(path):
+        raise ValueError("That isn't the right file - it should be the JSON from 'Download JSON' for a Desktop app.")
+    GOOGLE_DIR.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(path, CLIENT_FILE)
+    if remove_original:
+        try:
+            Path(path).unlink()  # no stray copy of the key left in Downloads
+        except OSError:
+            pass
+
+
 def connected(account: str = "main") -> bool:
     return token_path(account).exists()
 
@@ -134,18 +179,41 @@ def _use_chrome() -> None:
         webbrowser.register("chrome-jarvis", None, webbrowser.BackgroundBrowser(chrome), preferred=True)
 
 
-def sign_in(account: str, timeout: int | None = None) -> tuple[str, list[str]]:
+def _signin_browser(on_url) -> str:
+    """A browser entry that hands the sign-in link to `on_url` (so a window can show it as a fallback)
+    and opens it in Chrome, or the default browser."""
+    import webbrowser
+
+    from .tools.apps import _chrome_path
+    chrome = _chrome_path()
+
+    class _Browser(webbrowser.BaseBrowser):
+        def open(self, url, new=0, autoraise=True):
+            if on_url:
+                try:
+                    on_url(url)
+                except Exception:
+                    pass
+            if chrome:
+                return webbrowser.BackgroundBrowser(chrome).open(url)
+            return webbrowser.open(url)
+
+    webbrowser.register("jarvis-signin", None, _Browser("jarvis-signin"))
+    return "jarvis-signin"
+
+
+def sign_in(account: str, timeout: int | None = None, on_url=None) -> tuple[str, list[str]]:
     """Opens Google's sign-in page and waits for the user. Returns (email, scopes that weren't granted)."""
     from google_auth_oauthlib.flow import InstalledAppFlow
 
     if not has_client():
         raise FileNotFoundError(CLIENT_FILE)
-    _use_chrome()
     flow = InstalledAppFlow.from_client_secrets_file(str(CLIENT_FILE), SCOPES[account])
     creds = flow.run_local_server(
-        port=0, open_browser=True, prompt="select_account consent", access_type="offline", timeout_seconds=timeout,
+        port=0, open_browser=True, browser=_signin_browser(on_url),
+        prompt="select_account consent", access_type="offline", timeout_seconds=timeout,
         authorization_prompt_message="\n  If no Chrome tab opened, copy this whole link into Chrome's address bar:\n\n  {url}\n",
-        success_message="Jarvis is connected. You can close this tab and go back to the setup window.")
+        success_message="Jarvis is connected. You can close this tab.")
     GOOGLE_DIR.mkdir(parents=True, exist_ok=True)
     token_path(account).write_text(creds.to_json(), encoding="utf-8")
     got = set(flow.oauth2session.token.get("scope") or creds.scopes or [])
