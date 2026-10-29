@@ -96,7 +96,7 @@ The design follows **MARK LVI** by FatihMakes (CC BY-NC 4.0; see `NOTICE.md`), a
 | "Who won the game last night?" | Searches the web and answers |
 | "What's on my calendar tomorrow?" / "Add dentist Thursday at 3" | Google Calendar |
 | "Any important emails?" / "Reply to Sarah saying I'll be there" | Gmail (sending always asks first) |
-| "What homework is due this week?" / "Is anything missing?" | Your son's Google Classroom |
+| "What homework is due this week?" / "Is anything missing?" | Your Google Classroom assignments |
 | "Open my history essay" | Finds it in Google Drive and opens it in Chrome |
 | "Jarvis, shut down" | Closes Jarvis. "Shut down the PC" turns the computer off (after asking) |
 | "Remind me in 20 minutes to stretch" | Spoken reminder at the time |
