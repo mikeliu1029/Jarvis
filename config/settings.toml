@@ -9,6 +9,7 @@ title = "sir"              # how Jarvis addresses you
 name = ""                  # optional - your first name
 location = "auto"          # city for weather, e.g. "Austin, TX" or "London"; "auto" = from your IP address
 units = "auto"             # "imperial", "metric" or "auto" (imperial in the US)
+interests = []             # topics for the start-up article, e.g. ["space", "F1", "cooking"] (Settings → You)
 
 [brain]
 provider = "gemini_live"   # "gemini_live" (natural real-time voice, needs GEMINI_API_KEY in .env - falls back to local
@@ -87,9 +88,12 @@ news_categories = ["top", "world", "tech"]
 headlines_per_category = 2
 
 [proactive]
-enabled = true             # flag low disk/battery, runaway CPU, etc.
-cpu_high = 92              # % sustained for ~3 minutes
-memory_high = 92           # %
+enabled = true             # flag low disk/battery, and a PC under strain
+strain_alerts = true       # say when the PC is being pushed too hard (CPU, memory, GPU heat)
+cpu_high = 90              # % - "strained" once it's held for a minute
+memory_high = 90           # % - held for 30 seconds
+gpu_hot = 85               # °C - held for 30 seconds
+strain_cooldown_minutes = 20   # don't repeat the same warning sooner than this
 disk_low_gb = 15
 battery_low = 20
 

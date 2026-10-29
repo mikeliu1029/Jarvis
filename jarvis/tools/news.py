@@ -135,6 +135,18 @@ def _pick_article(items: list[dict], topic: str) -> dict:
     return max(items, key=score)  # max() keeps the first (newest) of equal scores
 
 
+def _remember_pick(topic: str, title: str) -> None:
+    """Recent picks steer the next start-up article somewhere new."""
+    try:
+        from ..memory import get_memory
+        mem = get_memory()
+        recent = (mem.get("recent_articles") or [])[-9:]
+        recent.append({"date": time.strftime("%Y-%m-%d"), "topic": topic, "title": title[:120]})
+        mem.set("recent_articles", recent)
+    except Exception:
+        log.debug("couldn't record article pick", exc_info=True)
+
+
 @registry.tool(
     "open_article",
     "Find the best fresh news article about a topic and open it in Chrome for the user to read - e.g. a new game "
@@ -157,6 +169,7 @@ def open_article(topic: str = "", url: str = "") -> str:
         return outcome.failed(f"I couldn't find a recent article about '{topic}'.")
     best = _pick_article(items, topic)
     open_url(best["link"])
+    _remember_pick(topic, best["title"])
     others = format_items([i for i in items if i is not best][:3], with_summary=False)
     return (outcome.done(f"Opened in Chrome: \"{best['title']}\" ({best['source']}).") +
             "\nTell the user in one or two sentences what it's about and why it's relevant to them." +

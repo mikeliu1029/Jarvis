@@ -89,16 +89,12 @@ def _imperial(country: str) -> bool:
     return country in ("US", "LR", "MM")
 
 
-@registry.tool(
-    "get_weather",
-    "Current weather plus today's and tomorrow's forecast. Location is optional (defaults to the user's).",
-    {"location": P("string", "City, e.g. 'London' or 'Austin, TX'", required=False)},
-)
-def get_weather(location: str = "") -> str:
+def weather_data(location: str = "", days: int = 2) -> dict:
+    """The raw forecast (also drawn by the HUD's weather panel)."""
     loc = resolve_location(location or None)
     imperial = _imperial(loc.get("country", ""))
     params = {
-        "latitude": loc["lat"], "longitude": loc["lon"], "timezone": "auto", "forecast_days": 2,
+        "latitude": loc["lat"], "longitude": loc["lon"], "timezone": "auto", "forecast_days": days,
         "current": "temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m",
         "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
         "temperature_unit": "fahrenheit" if imperial else "celsius",
@@ -107,6 +103,22 @@ def get_weather(location: str = "") -> str:
     r = requests.get("https://api.open-meteo.com/v1/forecast", params=params, timeout=8)
     r.raise_for_status()
     d = r.json()
+    d["_loc"], d["_imperial"] = loc, imperial
+    return d
+
+
+def describe(code: int) -> str:
+    return WMO.get(code, "mixed conditions")
+
+
+@registry.tool(
+    "get_weather",
+    "Current weather plus today's and tomorrow's forecast. Location is optional (defaults to the user's).",
+    {"location": P("string", "City, e.g. 'London' or 'Austin, TX'", required=False)},
+)
+def get_weather(location: str = "") -> str:
+    d = weather_data(location)
+    loc, imperial = d["_loc"], d["_imperial"]
     c, daily = d["current"], d["daily"]
     deg, wind = ("°F", "mph") if imperial else ("°C", "km/h")
 

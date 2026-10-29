@@ -534,44 +534,73 @@ def _reactor_icon() -> QIcon:
 
 
 class MainWindow(QMainWindow):
+    """The HUD. Layout after a classic Rainmeter JARVIS desktop; every panel does something."""
     event_sig = pyqtSignal(object)
 
     def __init__(self, jarvis: "Jarvis"):
         super().__init__()
+        from . import dashboard as D
+        self.D = D
         self.jarvis = jarvis
         s = jarvis.settings
         self._name = str(s.get("assistant.name", "J.A.R.V.I.S.") or "J.A.R.V.I.S.")
         self.setWindowTitle(f"{self._name} — HUD")
         self.setWindowIcon(_reactor_icon())
-        self.setMinimumSize(880, 600)
-        self.resize(1080, 720)
+        self.setMinimumSize(1180, 760)
+        avail = QApplication.primaryScreen().availableGeometry()
+        self.resize(min(1560, avail.width() - 40), min(940, avail.height() - 40))
         self._confirm: ConfirmBanner | None = None
         self._memory_ov: MemoryOverlay | None = None
-        self._metrics = _Metrics()
 
-        central = QWidget()
-        central.setStyleSheet(f"background: {C.BG};")
+        central = D.HudBackground()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
-        root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(0)
+        root.setContentsMargins(12, 8, 12, 8)
+        root.setSpacing(8)
         root.addWidget(self._header())
         body = QHBoxLayout()
-        body.setSpacing(0)
-        body.addWidget(self._left_panel())
-        self.hud = HudCanvas(self._name.upper())
-        self._content = self._content_panel()
-        split = QSplitter(Qt.Orientation.Vertical)
-        split.setStyleSheet(f"QSplitter::handle {{ background: {C.BORDER}; height: 4px; }}")
-        split.addWidget(self.hud)
-        split.addWidget(self._content)
-        split.setStretchFactor(0, 3)
-        split.setStretchFactor(1, 1)
-        split.setCollapsible(0, False)
-        self._split = split
-        body.addWidget(split, stretch=5)
-        body.addWidget(self._right_panel())
-        root.addLayout(body, stretch=1)
+        body.setSpacing(10)
+
+        left = QVBoxLayout()
+        left.setSpacing(10)
+        left.setContentsMargins(0, 0, 0, 0)
+        left.addWidget(D.LaunchPanel(jarvis))
+        left.addWidget(D.CalendarPanel(jarvis))
+        left.addWidget(D.WeatherPanel())
+        left.addWidget(D.TasksPanel(jarvis))
+        left.addStretch()
+        lw = QWidget()
+        lw.setLayout(left)
+        lw.setFixedWidth(270)
+        body.addWidget(lw)
+
+        centre = QVBoxLayout()
+        centre.setSpacing(8)
+        centre.addLayout(self._command_bar())
+        core_row = QHBoxLayout()
+        core_row.setSpacing(4)
+        core_row.addWidget(D.LinksPanel(jarvis))
+        self.hud = D.SuitCore(jarvis)
+        core_row.addWidget(self.hud, 1)
+        core_row.addLayout(self._chips())
+        centre.addLayout(core_row, 5)
+        centre.addWidget(self._tabs(), 2)
+        body.addLayout(centre, 1)
+
+        right = QVBoxLayout()
+        right.setSpacing(10)
+        right.setContentsMargins(0, 0, 0, 0)
+        right.addWidget(D.SystemPanel(jarvis))
+        right.addWidget(D.DiskPanel())
+        right.addWidget(D.NetworkPanel(jarvis))
+        right.addWidget(D.FoldersPanel())
+        right.addWidget(D.MediaPanel())
+        right.addStretch()
+        rw = QWidget()
+        rw.setLayout(right)
+        rw.setFixedWidth(310)
+        body.addWidget(rw)
+        root.addLayout(body, 1)
         root.addWidget(self._footer())
 
         self.event_sig.connect(self._on_event)
@@ -624,197 +653,161 @@ class MainWindow(QMainWindow):
     # ---- layout pieces ---------------------------------------------------------------------
     def _label(self, text, size=8, color=C.TEXT_MED, bold=False):
         lb = QLabel(text)
-        lb.setFont(QFont("Courier New", size, QFont.Weight.Bold if bold else QFont.Weight.Normal))
+        f = QFont("Courier New")
+        f.setPointSizeF(size)
+        f.setBold(bold)
+        lb.setFont(f)
         lb.setStyleSheet(f"color: {color}; background: transparent; border: none;")
         return lb
 
     def _header(self) -> QWidget:
+        D = self.D
         w = QWidget()
-        w.setFixedHeight(54)
-        w.setStyleSheet(f"background: {C.DARK}; border-bottom: 1px solid {C.BORDER_B};")
+        w.setFixedHeight(70)
         lay = QHBoxLayout(w)
-        lay.setContentsMargins(16, 0, 16, 0)
-        brain = self.jarvis.brain
-        self._engine_lbl = self._label(self.jarvis.core_label, 8, C.PRI_DIM)
-        lay.addWidget(self._engine_lbl)
+        lay.setContentsMargins(4, 0, 4, 0)
+        icon = QLabel()
+        icon.setPixmap(_reactor_icon().pixmap(46, 46))
+        lay.addWidget(icon)
+        col = QVBoxLayout()
+        col.setSpacing(0)
+        col.addStretch()
+        col.addWidget(self._label(self._name.upper(), 17, C.PRI, True))
+        self._engine_lbl = self._label(self.jarvis.core_label, 7.5, C.PRI_DIM, True)
+        col.addWidget(self._engine_lbl)
+        col.addStretch()
+        lay.addLayout(col)
         lay.addStretch()
-        mid = QVBoxLayout()
-        mid.setSpacing(1)
-        title = self._label(self._name.upper(), 17, C.PRI, True)
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        sub = self._label("Just A Rather Very Intelligent System", 7, C.PRI_DIM)
-        sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        mid.addWidget(title)
-        mid.addWidget(sub)
-        lay.addLayout(mid)
+        lay.addWidget(D.PowerBar())
         lay.addStretch()
-        right = QVBoxLayout()
-        right.setSpacing(2)
-        self._clock_lbl = self._label("00:00:00", 14, C.PRI, True)
-        self._date_lbl = self._label("", 7, C.TEXT_DIM)
-        for lb in (self._clock_lbl, self._date_lbl):
-            lb.setAlignment(Qt.AlignmentFlag.AlignRight)
-            right.addWidget(lb)
-        lay.addLayout(right)
+        lay.addWidget(D.ClockWidget())
         return w
 
-    def _left_panel(self) -> QWidget:
-        w = QWidget()
-        w.setFixedWidth(_LEFT_W)
-        w.setStyleSheet(f"background: {C.DARK}; border-right: 1px solid {C.BORDER};")
-        lay = QVBoxLayout(w)
-        lay.setContentsMargins(8, 10, 8, 10)
-        lay.setSpacing(6)
-        lay.addWidget(self._label("◈ SYS MONITOR", 7, C.PRI, True))
-        self._bars = {k: MetricBar(lbl, col) for k, lbl, col in (
-            ("cpu", "CPU", C.PRI), ("mem", "MEM", C.ACC2), ("net", "NET", C.GREEN),
-            ("gpu", "GPU", C.ACC), ("gtemp", "GPU °C", "#ff6688"))}
-        for bar in self._bars.values():
-            lay.addWidget(bar)
-        info = QWidget()
-        info.setStyleSheet(f"background: {C.PANEL2}; border: 1px solid {C.BORDER}; border-radius: 4px;")
-        il = QVBoxLayout(info)
-        il.setContentsMargins(6, 5, 6, 5)
-        self._up_lbl = self._label("UP  --:--", 8, C.GREEN, True)
-        self._proc_lbl = self._label("PROC  --", 8)
-        il.addWidget(self._up_lbl)
-        il.addWidget(self._proc_lbl)
-        il.addWidget(self._label("OS  WINDOWS", 8, C.ACC2))
-        lay.addWidget(info)
-        lay.addStretch()
-        self._core_lbl = self._label("AI CORE\nSTARTING", 7, C.ACC2, True)
-        self._voice_lbl = self._label(f"VOICE\n{self.jarvis.speaker.engine_name.upper()}", 7, C.PRI, True)
-        self._ears_lbl = self._label("EARS\n--", 7, C.TEXT_DIM, True)
-        for lb in (self._core_lbl, self._voice_lbl, self._ears_lbl):
-            lb.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            lb.setStyleSheet(lb.styleSheet() + f"background: {C.PANEL2}; border: 1px solid {C.BORDER_A}; "
-                                               f"border-radius: 3px; padding: 4px;")
-            lay.addWidget(lb)
-        return w
-
-    def _btn(self, text, fg, bg="transparent", height=30):
-        b = QPushButton(text)
-        b.setFixedHeight(height)
-        b.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
-        b.setCursor(Qt.CursorShape.PointingHandCursor)
-        b.setStyleSheet(f"QPushButton {{ background: {bg}; color: {fg}; border: 1px solid {fg}; border-radius: 3px; }}"
-                        f"QPushButton:hover {{ background: {C.PRI_GHO}; }}")
-        return b
-
-    def _right_panel(self) -> QWidget:
-        w = QWidget()
-        w.setFixedWidth(_RIGHT_W)
-        w.setStyleSheet(f"background: {C.DARK}; border-left: 1px solid {C.BORDER};")
-        lay = QVBoxLayout(w)
-        lay.setContentsMargins(8, 8, 8, 8)
-        lay.setSpacing(6)
-        lay.addWidget(self._label("▸ ACTIVITY LOG", 7, C.TEXT_MED, True))
-        self._log = LogWidget()
-        lay.addWidget(self._log, stretch=1)
-        lay.addWidget(self._label("▸ COMMAND INPUT", 7, C.TEXT_MED, True))
+    def _command_bar(self) -> QHBoxLayout:
+        D = self.D
         row = QHBoxLayout()
         self._input = QLineEdit()
-        self._input.setPlaceholderText("Type a command, sir…")
-        self._input.setFont(QFont("Courier New", 9))
-        self._input.setFixedHeight(30)
-        self._input.setStyleSheet(f"QLineEdit {{ background: #000d14; color: {C.WHITE}; border: 1px solid {C.BORDER};"
-                                  f" border-radius: 3px; padding: 3px 7px; }} QLineEdit:focus {{ border-color: {C.PRI}; }}")
+        self._input.setPlaceholderText(f"What can I do for you, {self.jarvis.title}?")
+        self._input.setFont(QFont("Segoe UI", 11))
+        self._input.setFixedHeight(38)
+        self._input.setStyleSheet(f"QLineEdit {{ background: rgba(0, 13, 20, 220); color: {C.WHITE}; "
+                                  f"border: 1px solid {C.BORDER_B}; border-radius: 4px; padding: 4px 12px; }}"
+                                  f"QLineEdit:focus {{ border-color: {C.PRI}; }}")
         self._input.returnPressed.connect(self._send)
-        send = self._btn("▸", C.PRI, C.PANEL)
-        send.setFixedWidth(30)
+        send = D.HexButton("SEND ▸", C.PRI, height=38)
+        send.setFixedWidth(100)
         send.clicked.connect(self._send)
-        row.addWidget(self._input)
+        row.addWidget(self._input, 1)
         row.addWidget(send)
-        lay.addLayout(row)
-        talk = self._btn("🎙  TALK  [CTRL+ALT+J]", C.GREEN, "#00140a")
-        talk.clicked.connect(self.jarvis.push_to_talk)
-        lay.addWidget(talk)
-        stop = self._btn("✋  INTERRUPT  [ESC]", C.MUTED_C, "#140008", 34)
-        stop.clicked.connect(self.jarvis.interrupt)
-        lay.addWidget(stop)
-        self._mic_btn = self._btn("", C.GREEN)
-        self._mic_btn.clicked.connect(self._toggle_mic)
-        self._style_mic()
-        lay.addWidget(self._mic_btn)
-        tools = QHBoxLayout()
-        mem = self._btn("🧠 MEMORY", C.TEXT_MED, height=26)
-        mem.clicked.connect(self._open_memory)
-        cfg = self._btn("⚙ SETTINGS", C.TEXT_MED, height=26)
-        cfg.clicked.connect(lambda: self.open_settings())
-        tools.addWidget(mem)
-        tools.addWidget(cfg)
-        lay.addLayout(tools)
-        return w
+        return row
 
-    def _content_panel(self) -> QWidget:
-        w = QWidget()
-        w.setObjectName("ContentPanel")
-        w.setStyleSheet(f"QWidget#ContentPanel {{ background: {C.PANEL}; border-top: 1px solid {C.BORDER_B}; }}")
-        w.hide()
-        lay = QVBoxLayout(w)
-        lay.setContentsMargins(12, 7, 12, 8)
-        hdr = QHBoxLayout()
-        hdr.addWidget(self._label("◈", 9, C.PRI, True))
-        self._content_title = self._label("RESULTS", 8, C.PRI, True)
-        hdr.addWidget(self._content_title)
-        hdr.addStretch()
-        self._content_ts = self._label("", 7, C.TEXT_DIM)
-        hdr.addWidget(self._content_ts)
-        dismiss = QPushButton("DISMISS  ✕")
-        dismiss.setFont(QFont("Courier New", 7))
-        dismiss.setCursor(Qt.CursorShape.PointingHandCursor)
-        dismiss.setStyleSheet(f"QPushButton {{ background: transparent; color: {C.TEXT_DIM}; border: 1px solid "
-                              f"{C.BORDER}; border-radius: 2px; padding: 0 5px; }}")
-        dismiss.clicked.connect(w.hide)
-        hdr.addWidget(dismiss)
-        lay.addLayout(hdr)
+    def _chips(self) -> QVBoxLayout:
+        """Status you can click: core (keys), voice (voice settings), ears (mute), memory, settings."""
+        D = self.D
+        col = QVBoxLayout()
+        col.setSpacing(8)
+        col.addSpacing(30)
+        self._core_chip = D.HexButton("AI CORE\n…", C.GREEN, slant=8, height=46)
+        self._core_chip.clicked.connect(lambda: self.open_settings("start"))
+        self._voice_chip = D.HexButton("VOICE\n…", C.PRI, slant=8, height=46)
+        self._voice_chip.clicked.connect(lambda: self.open_settings("voice"))
+        self._ears_chip = D.HexButton("EARS\n…", C.GREEN, slant=8, height=46)
+        self._ears_chip.clicked.connect(self._toggle_mic)
+        mem = D.HexButton("MEMORY", C.TEXT_MED, slant=8, height=34)
+        mem.clicked.connect(self._open_memory)
+        cfg = D.HexButton("SETTINGS", C.TEXT_MED, slant=8, height=34)
+        cfg.clicked.connect(lambda: self.open_settings())
+        for chip in (self._core_chip, self._voice_chip, self._ears_chip, mem, cfg):
+            chip.setFixedWidth(130)
+            chip.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
+            col.addWidget(chip)
+        col.addStretch()
+        return col
+
+    def _tabs(self) -> QWidget:
+        from PyQt6.QtWidgets import QTabWidget
+        tabs = QTabWidget()
+        tabs.setStyleSheet(f"""
+            QTabWidget::pane {{ border: 1px solid {C.BORDER_B}; background: rgba(1, 13, 20, 225); top: -1px; }}
+            QTabBar::tab {{ background: transparent; color: {C.TEXT_MED}; font-family: 'Courier New';
+                            font-weight: bold; font-size: 8pt; padding: 6px 16px; border: 1px solid {C.BORDER};
+                            border-bottom: none; margin-right: 3px; }}
+            QTabBar::tab:selected {{ color: {C.PRI}; border-color: {C.BORDER_B}; background: rgba(0, 31, 46, 200); }}
+        """)
+        self._log = LogWidget()
+        self._log.setStyleSheet(self._log.styleSheet().replace(f"background: {C.PANEL}", "background: transparent")
+                                .replace(f"border: 1px solid {C.BORDER}", "border: none"))
+        tabs.addTab(self._log, "▸ CONVERSATION")
         self._content_text = QTextEdit()
         self._content_text.setReadOnly(True)
-        self._content_text.setFont(QFont("Courier New", 8))
-        self._content_text.setStyleSheet(f"QTextEdit {{ background: {C.DARK}; color: {C.TEXT}; border: 1px solid "
-                                         f"{C.BORDER}; border-radius: 3px; padding: 6px 8px; }}")
-        lay.addWidget(self._content_text)
-        return w
+        self._content_text.setFont(QFont("Segoe UI", 9))
+        self._content_text.setStyleSheet(f"QTextEdit {{ background: transparent; color: {C.TEXT}; border: none; "
+                                         f"padding: 6px 8px; }}")
+        self._content_text.setPlaceholderText("News, search results and briefings appear here.")
+        tabs.addTab(self._content_text, "▸ RESULTS")
+        self._tabs_w = tabs
+        return tabs
 
     def _footer(self) -> QWidget:
+        D = self.D
         w = QWidget()
-        w.setFixedHeight(22)
-        w.setStyleSheet(f"background: {C.DARK}; border-top: 1px solid {C.BORDER};")
+        w.setFixedHeight(34)
         lay = QHBoxLayout(w)
-        lay.setContentsMargins(14, 0, 14, 0)
-        lay.addWidget(self._label("\"Hey Jarvis\" · [ESC] Interrupt · [F4] Mute mic · [F11] Fullscreen", 7))
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(8)
+        self._mic_btn = D.HexButton("", C.GREEN, height=28)
+        self._mic_btn.setFixedWidth(200)
+        self._mic_btn.clicked.connect(self._toggle_mic)
+        talk = D.HexButton("TALK  [CTRL+ALT+J]", C.GREEN, height=28)
+        talk.setFixedWidth(180)
+        talk.clicked.connect(self.jarvis.push_to_talk)
+        stop = D.HexButton("INTERRUPT  [ESC]", C.MUTED_C, height=28)
+        stop.setFixedWidth(160)
+        stop.clicked.connect(self.jarvis.interrupt)
+        full = D.HexButton("FULLSCREEN  [F11]", C.TEXT_MED, height=28)
+        full.setFixedWidth(160)
+        full.clicked.connect(self._toggle_full)
+        for b in (self._mic_btn, talk, stop, full):
+            lay.addWidget(b)
         lay.addStretch()
-        lay.addWidget(self._label("HUD design after MARK LVI by FatihMakes (CC BY-NC 4.0)", 7, C.PRI_DIM))
+        lay.addWidget(self._label('Say "Jarvis, ..." anywhere in a sentence', 7, C.TEXT_DIM))
+        lay.addSpacing(14)
+        lay.addWidget(self._label("Core HUD elements after MARK LVI by FatihMakes (CC BY-NC 4.0)", 7, C.PRI_DIM))
+        self._style_mic()
         return w
 
     # ---- behaviour ------------------------------------------------------------------------
     def _tick(self):
-        self._clock_lbl.setText(time.strftime("%H:%M:%S"))
-        self._date_lbl.setText(time.strftime("%a %d %b %Y"))
-        d = self._metrics.data
-        self._bars["cpu"].set_value(d["cpu"], f"{d['cpu']:.0f}%")
-        self._bars["mem"].set_value(d["mem"], f"{d['mem']:.0f}%")
-        net = d["net"]
-        self._bars["net"].set_value(min(100, net * 10), f"{net * 1024:.0f}KB/s" if net < 1 else f"{net:.1f}MB/s")
-        self._bars["gpu"].set_value(max(0, d["gpu"]), f"{d['gpu']:.0f}%" if d["gpu"] >= 0 else "N/A")
-        self._bars["gtemp"].set_value(max(0, d["gtemp"]), f"{d['gtemp']:.0f}°C" if d["gtemp"] >= 0 else "N/A")
-        up = time.time() - psutil.boot_time()
-        self._up_lbl.setText(f"UP  {int(up // 3600):02d}:{int(up % 3600 // 60):02d}")
-        self._proc_lbl.setText(f"PROC  {len(psutil.pids())}")
         j = self.jarvis
-        self._core_lbl.setText("AI CORE\nONLINE" if j.ok else "AI CORE\nFAULT")
-        col = C.GREEN if j.ok else C.RED
-        if col not in self._core_lbl.styleSheet():
-            self._core_lbl.setStyleSheet(f"color: {col}; background: {C.PANEL2}; border: 1px solid {C.BORDER_A}; "
-                                         f"border-radius: 3px; padding: 4px;")
-        self._core_lbl.setToolTip(j.brain_problem or getattr(j.brain, "label_long", ""))
+        s = j.strain.now
+        bat = psutil.sensors_battery()
+        if bat:
+            trend = "charging" if bat.power_plugged else ("holding steady" if bat.percent > 40 else "dropping")
+            self.hud.power_line = f"Power level at {bat.percent:.0f} percent and {trend}."
+        else:
+            self.hud.power_line = "Running on mains power. All systems online."
+        self.hud.strain_level = s.level
+        if s.reasons:
+            self.hud.strain_line = "Under strain: " + "; ".join(s.reasons)
+        else:
+            gpu = f" · GPU {s.gpu:.0f}% at {s.gpu_temp:.0f}°C" if s.gpu >= 0 else ""
+            word = "Working hard" if s.level == "busy" else "All systems nominal"
+            self.hud.strain_line = f"{word} · CPU {s.cpu:.0f}% · RAM {s.ram:.0f}%{gpu}"
+        awaiting = getattr(j, "awaiting_key", False)
+        core_ok = j.ok and not awaiting
+        self._core_chip.setText("AI CORE\n" + ("ONLINE" if core_ok else "NEEDS KEY" if awaiting else "FAULT"))
+        self._core_chip._color = C.GREEN if core_ok else C.RED
+        self._core_chip.setToolTip(j.brain_problem or j.core_label)
+        self._voice_chip.setText("VOICE\n" + j.voice_label[:16])
         if j.live_active:
             ears = "MUTED" if j.mic_muted else "LIVE"
         else:
             ears = "OFF" if not j.listener else ("ERROR" if j.listener.error else ("MUTED" if j.mic_muted else "ON"))
+        self._ears_chip.setText(f"EARS\n{ears}")
+        self._ears_chip._color = C.MUTED_C if ears in ("MUTED", "OFF", "ERROR") else C.GREEN
+        for chip in (self._core_chip, self._ears_chip):
+            chip.update()
         self._engine_lbl.setText(j.core_label)
-        self._voice_lbl.setText(f"VOICE\n{j.voice_label}")
-        self._ears_lbl.setText(f"EARS\n{ears}")
 
     def _send(self):
         text = self._input.text().strip()
@@ -830,23 +823,17 @@ class MainWindow(QMainWindow):
     def _style_mic(self):
         muted = self.jarvis.mic_muted
         self.hud.muted = muted
-        col, bg = (C.MUTED_C, "#140006") if muted else (C.GREEN, "#00140a")
-        self._mic_btn.setText("🔇  MICROPHONE MUTED  [F4]" if muted else "🎙  MICROPHONE ACTIVE  [F4]")
-        self._mic_btn.setStyleSheet(f"QPushButton {{ background: {bg}; color: {col}; border: 1px solid {col}; "
-                                    f"border-radius: 3px; }}")
+        self._mic_btn.setText("MIC MUTED  [F4]" if muted else "MIC LIVE  [F4]")
+        self._mic_btn._color = C.MUTED_C if muted else C.GREEN
+        self._mic_btn.update()
 
     def _toggle_full(self):
         self.showNormal() if self.isFullScreen() else self.showFullScreen()
 
     def _show_content(self, title: str, text: str):
-        self._content_title.setText(title.upper()[:60])
-        self._content_ts.setText(time.strftime("%H:%M:%S"))
-        self._content_text.setPlainText(text)
-        first = not self._content.isVisible()
-        self._content.show()
-        if first:
-            total = self._split.height()
-            self._split.setSizes([max(total - 230, 140), 230])
+        self._content_text.setPlainText(f"{title.upper()}  ·  {time.strftime('%H:%M')}\n\n{text}")
+        self._tabs_w.setTabText(1, f"▸ RESULTS · {title.upper()[:28]}")
+        self._tabs_w.setCurrentIndex(1)
 
     def _centre(self, w: QWidget):
         cw = self.centralWidget()

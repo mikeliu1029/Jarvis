@@ -30,10 +30,12 @@ STOP = re.compile(r"^\s*(stop|cancel|shut up|be quiet|quiet|silence|never ?mind|
 NEWS_RUNDOWN = ("Give a quick spoken news rundown: start with 'In the news,' and cover the three most significant "
                 "stories - lead with major world and national events (conflicts, unrest, elections, disasters, big "
                 "economic news) before tech - one short sentence each. Mention the full list is on screen.")
-ARTICLE_PICK = ("\n\nFinally, open ONE article for the user to read: call open_article with a topic you know they're "
-                "into (games they play, their interests, what they were working on - see your memory). If you know "
-                "nothing about them yet, use the topic of the most interesting headline above. Say in one short line "
-                "what you've put on screen and why you thought they'd like it.")
+# Kinds of story to rotate through when there's little to go on - so the pick isn't the same thing every day.
+VARIETY = ["a striking science or space discovery", "a clever new piece of technology", "a big sports story",
+           "something from film, TV or music", "an inspiring or unusual human story", "a health or food finding",
+           "a notable business or economy story", "nature, animals or the environment", "history or archaeology"]
+GAME_WORDS = ("game", "gaming", "valorant", "cyberpunk", "call of duty", "gta", "playstation", "xbox", "nintendo",
+              "steam", "fortnite", "minecraft")
 # All the start-up turn may use: it reads things and opens one article, but changes nothing on the PC.
 # tool -> allowed actions ("" = the tool's default action), or None for any action of a read-only tool.
 STARTUP_TOOLS = {"daily_briefing": None, "get_news": None, "get_weather": None, "system_status": None,
@@ -88,6 +90,8 @@ class Jarvis:
         self.awaiting_key = provider in ("gemini_live", "gemini") and not secret("GEMINI_API_KEY")
         if not self.use_live and not self.awaiting_key:
             self._init_local_speaker()
+        from .strain import StrainMonitor
+        self.strain = StrainMonitor(settings, on_alert=self._strain_alert)  # started in start(); the HUD reads it
         self.hud = None
         # `hud` here means the optional *browser* HUD; the desktop HUD is a window run by __main__.
         self.hud_enabled = hud
@@ -135,6 +139,7 @@ class Jarvis:
         return self.speaker.engine_name.upper()
 
     def start(self) -> None:
+        self.strain.start()
         self.mcp.start()
         threading.Thread(target=self._worker, name="jarvis-worker", daemon=True).start()
         threading.Thread(target=self._scheduler, name="jarvis-scheduler", daemon=True).start()
@@ -529,7 +534,28 @@ class Jarvis:
 
     @property
     def _article_pick(self) -> str:
-        return ARTICLE_PICK if self.settings.get("briefing.open_article_on_launch", True) else ""
+        """One article to open at start-up - varied, not just games: the user's stated interests first, never
+        the same kind of story as the last few picks, and gaming only now and then."""
+        if not self.settings.get("briefing.open_article_on_launch", True):
+            return ""
+        import random
+        interests = [str(i).strip() for i in (self.settings.get("user.interests") or []) if str(i).strip()]
+        recent = [r.get("topic", "") for r in (self.memory.get("recent_articles") or [])][-6:]
+        games_lately = any(w in t.lower() for t in recent[-3:] for w in GAME_WORDS)
+        ideas = random.sample(VARIETY, 3)
+        return ("\n\nFinally, open ONE article for the user to read: call open_article with a specific topic. "
+                + (f"Their interests: {', '.join(interests)} - pick one of these, rotating. " if interests else
+                   "Draw on everything you know about them (memory), not just games. ")
+                + f"Recent picks - choose a DIFFERENT subject area (not just a different story): "
+                  f"{'; '.join(recent) or 'none yet'}. "
+                + "Only call something their interest if it's in their interests or your memory - otherwise just "
+                  "say why it's worth a look. "
+                + ("No video games this time. " if games_lately else
+                   "Video games only occasionally - they hear game news whenever they launch a game. ")
+                + f"If nothing in particular fits, go for {ideas[0]}, {ideas[1]} or {ideas[2]}. "
+                + "Make it something fascinating or enjoyable to read - not a disaster, crime or tragedy (the news "
+                  "rundown already covers those). "
+                "Say in one short line what you've put on screen and why you thought they'd like it.")
 
     def _greet_live(self, part: str, full_briefing: bool) -> None:
         """One natural opening turn: the greeting and the news together, in Gemini's voice."""
@@ -634,17 +660,17 @@ class Jarvis:
                          text="\n".join(f"- {it['title']} ({it.get('source', '')})" for it in fresh[:6]))
             break  # at most one topic per tick keeps this light
 
+    def _strain_alert(self, key: str, text: str, urgent: bool) -> None:
+        """The strain monitor has already allowed for games and cool-downs; just don't talk over the user."""
+        if not self.settings.get("proactive.enabled", True):
+            return
+        if time.time() - self.last_user_activity < 8 or self.state == "speaking":
+            return  # it'll still be true in a moment; the monitor's cool-down lets it try again later
+        self._announce(f"strain:{key}", text, cooldown=0, urgent=True)
+
     def _health_check(self) -> None:
+        # CPU, memory and GPU strain are watched continuously by strain.py; this covers the slow things.
         s, t = self.settings, self.title
-        cpu = psutil.cpu_percent(interval=1)
-        self._cpu_high_count = self._cpu_high_count + 1 if cpu >= float(s.get("proactive.cpu_high", 92)) else 0
-        if self._cpu_high_count >= 3:
-            from .tools.system import _top_processes
-            top = _top_processes(1)[0]
-            culprit = f" {top[0][0]} seems to be the culprit." if top else ""
-            self._announce("cpu", f"{t.capitalize()}, the processor has been flat out for a few minutes.{culprit}")
-        if psutil.virtual_memory().percent >= float(s.get("proactive.memory_high", 92)):
-            self._announce("ram", f"Memory is nearly full, {t}. Closing a few programs may help.")
         try:
             free = psutil.disk_usage("C:\\").free / 2**30
             if free < float(s.get("proactive.disk_low_gb", 15)):

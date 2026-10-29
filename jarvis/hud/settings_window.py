@@ -496,6 +496,16 @@ class SettingsWindow(QWidget):
                      help="Pick one or type your own.")
         self._text(c, "user.location", "Your city", 'For the weather, e.g. "Austin, TX". Type auto to work it '
                    "out from your internet connection.", placeholder="auto")
+        ed = QLineEdit(", ".join(str(i) for i in (self.settings.get("user.interests") or [])))
+        ed.setPlaceholderText("e.g. space, Formula 1, cooking, AI, history")
+
+        def save_interests():
+            items = [t.strip() for t in re.split(r"[,;\n]", ed.text()) if t.strip()]
+            if items != list(self.settings.get("user.interests") or []):
+                self._save("user.interests", items, live=True)  # used from the next start-up
+        ed.editingFinished.connect(save_interests)
+        self._row(c, "Things you're into", ed, "Separate with commas. His start-up article rotates through these - "
+                  "games are just one of many.")
         self._choice(c, "user.units", "Units", [("auto", "Automatic (imperial in the US)"),
                                                 ("imperial", "Imperial - °F, miles"), ("metric", "Metric - °C, km")])
         self._text(c, "assistant.name", "Assistant's name", "Shown in the window and used in his personality.")
@@ -765,6 +775,36 @@ class SettingsWindow(QWidget):
         line.setContentsMargins(0, 0, 0, 0)
         self._row(c, "Caption timing", holder, "Words ahead of his voice? Slide toward later. Behind? Toward earlier. "
                   "Takes effect immediately.")
+        from .dashboard import DEFAULT_APPS, DEFAULT_LINKS
+        q = self._card(lay, "HUD shortcuts", "The LAUNCH tabs and the site links beside the suit. Changes show next "
+                                             "time Jarvis starts.")
+        apps_ed = QLineEdit(", ".join(self.settings.get("hud.quick_apps") or DEFAULT_APPS))
+
+        def save_apps():
+            items = [a.strip() for a in apps_ed.text().split(",") if a.strip()]
+            self._save("hud.quick_apps", items)
+        apps_ed.editingFinished.connect(save_apps)
+        self._row(q, "Launch tabs (apps)", apps_ed, "App names as in the Start menu, separated by commas. Apps you "
+                  "don't have are skipped.")
+        links_ed = QPlainTextEdit("\n".join(f"{n} | {u}" for n, u in (self.settings.get("hud.links") or DEFAULT_LINKS)))
+        links_ed.setFixedHeight(150)
+        links_ed.setFont(QFont("Consolas", 9))
+        links_btn = QPushButton("Save links")
+
+        def save_links():
+            items = []
+            for line in links_ed.toPlainText().splitlines():
+                if "|" in line:
+                    name, url = (x.strip() for x in line.split("|", 1))
+                    if name and url.startswith(("http://", "https://")):
+                        items.append([name, url])
+            self._save("hud.links", items)
+            links_btn.setText("Saved ✓")
+            QTimer.singleShot(1500, lambda: links_btn.setText("Save links"))
+        links_btn.clicked.connect(save_links)
+        q.addWidget(QLabel("Site links - one per line, as  Name | https://address"))
+        q.addWidget(links_ed)
+        q.addWidget(links_btn, 0, Qt.AlignmentFlag.AlignLeft)
         h = self._card(lay, "Main window")
         self._choice(h, "hud.mode", "Jarvis's window", [("desktop", "Desktop window (recommended)"),
                                                          ("browser", "Web page in the browser"),
@@ -791,7 +831,16 @@ class SettingsWindow(QWidget):
         self._toggle(c, "safety.confirm_overwrite", "Ask before overwriting a file")
         self._toggle(c, "safety.confirm_power", "Ask before sleep, restart or shutdown")
         p = self._card(lay, "Heads-up alerts")
-        self._toggle(p, "proactive.enabled", "Warn me about low disk space, low battery, or a runaway CPU")
+        self._toggle(p, "proactive.enabled", "Warn me about low disk space and low battery")
+        self._toggle(p, "proactive.strain_alerts", "Tell me when my PC is under strain",
+                     "He names what's responsible. In full-screen games he only mentions heat and memory - a "
+                     "busy GPU is normal there.")
+        self._number(p, "proactive.cpu_high", "Processor busy above", 50, 100, suffix=" %", default=90,
+                     help="For over a minute.")
+        self._number(p, "proactive.memory_high", "Memory full above", 50, 100, suffix=" %", default=90)
+        self._number(p, "proactive.gpu_hot", "Graphics card hot above", 60, 100, suffix=" °C", default=85)
+        self._number(p, "proactive.strain_cooldown_minutes", "Don't repeat a warning for", 5, 240, suffix=" min",
+                     default=20)
         self._number(p, "proactive.disk_low_gb", "Low disk space below", 1, 500, suffix=" GB", default=15)
         self._number(p, "proactive.battery_low", "Low battery below", 5, 50, suffix=" %", default=20)
         lay.addStretch()

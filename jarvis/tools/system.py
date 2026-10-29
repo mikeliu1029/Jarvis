@@ -85,6 +85,11 @@ def system_status() -> str:
     win = winutil.foreground_window()
     if win:
         lines.append(f"Active window: {win.title} [{win.process}]")
+    from .. import strain
+    if strain.CURRENT is not None:  # the continuous monitor's verdict (it knows how long things have lasted)
+        s = strain.CURRENT.now
+        verdict = {"ok": "fine", "busy": "working hard but coping", "strained": "under strain"}[s.level]
+        lines.append(f"Overall: {verdict}" + (" - " + "; ".join(s.reasons) if s.reasons else ""))
     return "\n".join(lines)
 
 

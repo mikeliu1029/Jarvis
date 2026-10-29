@@ -33,12 +33,27 @@ No files to edit.
 
 ## Using Jarvis
 
-Start him with the desktop button (or `run_jarvis.bat`). His window has:
-- **Reactor core and waveform:** they react to Jarvis's voice and yours.
-- **System monitor:** CPU, memory, network, GPU and GPU temperature.
-- **Typewriter activity log** and a **command box**.
-- **Results panel:** search, news and briefing results.
-- **Buttons:** Talk, Interrupt (Esc), Mute mic (F4), Memory and Settings.
+Start him with the desktop button (or `run_jarvis.bat`). His window is a full HUD, and every panel works:
+
+- **Centre:** a suit-and-helmet wireframe whose eyes and arc reactor light up with his voice, his state (listening / thinking / speaking), and how the PC is doing. Above it, a command box; beside it, links to your sites.
+- **Clickable status chips:** AI core (opens his key settings), voice (voice settings), ears (click to mute), memory, settings.
+- **Left:**
+  - **Launch tabs** for your apps.
+  - **Calendar:** this week, with your next Google Calendar events.
+  - **Weather:** now, today, tomorrow and the day after.
+  - **To-do & reminders:** tick to finish, type to add.
+- **Right:**
+  - **System:** CPU/memory rings, GPU load, heat and memory, and a strain verdict naming the culprit. **Task Manager** and **What's slow?** buttons.
+  - **Disks:** click one to open it.
+  - **Network:** your IPs (click to copy) and a live speed graph.
+  - **Folders:** Downloads, Documents and co.
+  - **Now playing:** whatever's playing in Windows, with controls and volume.
+- **Top:** shut down / restart / sleep / lock (each asks first), and the clock with uptime.
+- **Bottom:** conversation and results tabs, then mic, talk, interrupt and fullscreen buttons.
+
+The launch tabs and site links can be changed in Settings → Pop-up & display.
+
+**Strain alerts.** Jarvis watches CPU, memory, GPU heat and graphics memory all the time. When the PC is pushed hard for a while, he says so and names what's responsible, e.g. "memory's nearly full, sir; Chrome alone is using 9 gigabytes". During full-screen games he only mentions heat and running out of memory, since a maxed-out GPU is normal there. Thresholds are in Settings → Safety.
 
 Close the window to shut Jarvis down, or say "Jarvis, shut down".
 
